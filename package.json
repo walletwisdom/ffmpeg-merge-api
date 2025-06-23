@@ -7,7 +7,8 @@
  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/walletwisdom/ffmpeg-merge-api.git"
+    "url": "https://github.com/walletwisdom/ffmpeg-merge-api.git"
+
   },
   "keywords": [],
   "author": "",
