@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const axios = require("axios");
 
-const app = express(); // <-- This was missing
+const app = express(); // ✅ THIS WAS MISSING BEFORE
 app.use(cors());
 app.use(express.json());
 
@@ -32,7 +32,6 @@ app.post("/merge", async (req, res) => {
   const outputPath = path.join(publicDir, outputFilename);
 
   try {
-    // Download video
     const videoResponse = await axios({ url: videoUrl, responseType: "stream" });
     await new Promise((resolve, reject) => {
       const stream = fs.createWriteStream(videoPath);
@@ -41,7 +40,6 @@ app.post("/merge", async (req, res) => {
       stream.on("error", reject);
     });
 
-    // Download audio
     const audioResponse = await axios({ url: audioUrl, responseType: "stream" });
     await new Promise((resolve, reject) => {
       const stream = fs.createWriteStream(audioPath);
@@ -50,7 +48,6 @@ app.post("/merge", async (req, res) => {
       stream.on("error", reject);
     });
 
-    // Merge with FFmpeg
     ffmpeg()
       .input(videoPath)
       .input(audioPath)
