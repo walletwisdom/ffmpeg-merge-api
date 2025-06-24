@@ -1,4 +1,23 @@
+const express = require("express");
+const cors = require("cors");
+const fs = require("fs");
+const ffmpeg = require("fluent-ffmpeg");
+const { v4: uuidv4 } = require("uuid");
+const path = require("path");
 const axios = require("axios");
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const publicDir = path.join(__dirname, "public");
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir);
+}
+
+app.get("/", (req, res) => {
+  res.send("✅ FFmpeg Merge API is running.");
+});
 
 app.post("/merge", async (req, res) => {
   const { videoUrl, audioUrl } = req.body;
@@ -13,7 +32,7 @@ app.post("/merge", async (req, res) => {
   const outputPath = path.join(publicDir, outputFilename);
 
   try {
-    // Download video file
+    // Download video
     const videoResponse = await axios({ url: videoUrl, responseType: "stream" });
     await new Promise((resolve, reject) => {
       const stream = fs.createWriteStream(videoPath);
@@ -22,7 +41,7 @@ app.post("/merge", async (req, res) => {
       stream.on("error", reject);
     });
 
-    // Download audio file
+    // Download audio
     const audioResponse = await axios({ url: audioUrl, responseType: "stream" });
     await new Promise((resolve, reject) => {
       const stream = fs.createWriteStream(audioPath);
@@ -31,16 +50,14 @@ app.post("/merge", async (req, res) => {
       stream.on("error", reject);
     });
 
-    // Merge audio + video using FFmpeg
+    // Merge with FFmpeg
     ffmpeg()
       .input(videoPath)
       .input(audioPath)
       .outputOptions(["-c:v copy", "-c:a aac", "-shortest"])
       .on("end", () => {
-        // Cleanup temp files
         fs.unlinkSync(videoPath);
         fs.unlinkSync(audioPath);
-
         const fileUrl = `${req.protocol}://${req.get("host")}/public/${outputFilename}`;
         res.json({ fileUrl });
       })
@@ -49,8 +66,17 @@ app.post("/merge", async (req, res) => {
         res.status(500).json({ error: "Error during merging" });
       })
       .save(outputPath);
+
   } catch (err) {
     console.error("Download error:", err);
     res.status(500).json({ error: "Error downloading files" });
   }
 });
+
+app.use("/public", express.static(publicDir));
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`✅ FFmpeg Merge API is running on port ${port}`);
+});
+
