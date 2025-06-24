@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const axios = require("axios");
 
-const app = express();
+const app = express(); // <-- This was missing
 app.use(cors());
 app.use(express.json());
 
@@ -79,4 +79,3 @@ const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`✅ FFmpeg Merge API is running on port ${port}`);
 });
-
