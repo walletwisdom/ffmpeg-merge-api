@@ -1,67 +1,56 @@
-const express = require('express');
-const cors = require('cors');
-const { exec } = require('child_process');
+const express = require("express");
+const cors = require("cors");
+const fs = require("fs");
+const ffmpeg = require("fluent-ffmpeg");
+const { v4: uuidv4 } = require("uuid");
+const path = require("path");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check
-app.get('/', (req, res) => {
-  res.send('✅ FFmpeg Merge API is running');
+const publicDir = path.join(__dirname, "public");
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir);
+}
+
+// Root route for Railway health check
+app.get("/", (req, res) => {
+  res.send("✅ FFmpeg Merge API is running on Railway.");
 });
 
-// Merge endpoint
-app.post('/merge', async (req, res) => {
-  const { videoUrls } = req.body;
+app.post("/merge", async (req, res) => {
+  const { videoUrl, audioUrl } = req.body;
 
-  if (!videoUrls || !Array.isArray(videoUrls) || videoUrls.length < 2) {
-    return res.status(400).json({ error: 'Missing or invalid videoUrls array' });
+  if (!videoUrl || !audioUrl) {
+    return res.status(400).json({ error: "Missing videoUrl or audioUrl" });
   }
 
-  try {
-    const timestamp = Date.now();
-    const outputFilename = `merged-${timestamp}.mp4`;
-    const outputPath = path.join(__dirname, 'output', outputFilename);
+  const outputFilename = `${uuidv4()}.mp4`;
+  const outputPath = path.join(publicDir, outputFilename);
 
-    // Build FFmpeg input file list
-    const inputList = videoUrls.map((url, index) => `file 'input${index}.mp4'`).join('\n');
-    const inputListPath = path.join(__dirname, 'input.txt');
-
-    // Download all videos to local disk
-    const download = require('node-fetch');
-    const fs = require('fs');
-
-    for (let i = 0; i < videoUrls.length; i++) {
-      const response = await download(videoUrls[i]);
-      const buffer = await response.buffer();
-      fs.writeFileSync(path.join(__dirname, `input${i}.mp4`), buffer);
-    }
-
-    fs.writeFileSync(inputListPath, inputList);
-
-    // Run FFmpeg concat
-    exec(`ffmpeg -f concat -safe 0 -i input.txt -c copy ${outputPath}`, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`FFmpeg error: ${error.message}`);
-        return res.status(500).json({ error: 'Failed to merge videos' });
-      }
-
-      console.log('FFmpeg output:', stdout);
-      return res.status(200).json({
-        message: 'Merge successful',
-        videoUrl: `https://ffmpeg-merge-api-production-4c8c.up.railway.app/output/${outputFilename}`
-      });
-    });
-
-  } catch (err) {
-    console.error('Merge error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
+  ffmpeg()
+    .input(videoUrl)
+    .input(audioUrl)
+    .outputOptions([
+      "-c:v copy",        // copy the video stream
+      "-c:a aac",         // encode audio to AAC
+      "-shortest"         // match the shortest stream duration
+    ])
+    .on("end", () => {
+      const fileUrl = `${req.protocol}://${req.get("host")}/public/${outputFilename}`;
+      res.json({ fileUrl });
+    })
+    .on("error", (err) => {
+      console.error("FFmpeg error:", err);
+      res.status(500).json({ error: "Error during merging" });
+    })
+    .save(outputPath);
 });
 
+app.use("/public", express.static(publicDir));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`✅ FFmpeg Merge API running on port ${port}`);
 });
