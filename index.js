@@ -66,7 +66,7 @@ app.post("/merge", async (req, res) => {
         fs.unlinkSync(videoPath);
         fs.unlinkSync(audioPath);
 
-        const fileUrl = `${req.protocol}://${req.get("host")}/public/${outputFilename}`;
+        const fileUrl = `${req.protocol}://${req.get("host")}/${outputFilename}`;
         res.json({ fileUrl });
       })
       .on("error", (err) => {
